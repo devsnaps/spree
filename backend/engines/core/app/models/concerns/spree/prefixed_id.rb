@@ -14,17 +14,20 @@ module Spree
   module PrefixedId
     extend ActiveSupport::Concern
 
-    SQIDS = Sqids.new(min_length: 10)
+    SQIDS = Sqids.new(
+      min_length: 12,
+      alphabet: '0123456789' # Only digits, so encoded IDs will be numeric-only
+    )
 
     included do
       class_attribute :_prefix_id_prefix, instance_writer: false
     end
 
-    # Returns the Stripe-style prefixed ID, or nil for unsaved records.
+    # Returns the Sqids-based ID (numeric-only in our configuration), or nil for unsaved records.
     def prefixed_id
       return nil unless id.present?
 
-      "#{self.class._prefix_id_prefix}_#{Spree::PrefixedId::SQIDS.encode([id])}"
+      Spree::PrefixedId::SQIDS.encode([id])
     end
 
     # Use prefixed_id for URL params when available.
@@ -59,10 +62,11 @@ module Spree
       def decode_prefixed_id(prefixed_id_string)
         return nil if prefixed_id_string.blank?
 
-        parts = prefixed_id_string.to_s.split('_', 2)
-        return nil if parts.length != 2
+        str = prefixed_id_string.to_s
+        parts = str.split('_', 2)
+        # Support both "prefix_encoded" and bare "encoded" (numeric-only IDs without prefix)
+        encoded = parts.length == 2 ? parts.last : parts.first
 
-        _prefix, encoded = parts
         ids = Spree::PrefixedId::SQIDS.decode(encoded)
         ids.first
       end
